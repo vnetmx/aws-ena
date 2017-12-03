@@ -2,7 +2,7 @@
 
 [ "root" != "$USER" ] && exec sudo $0 "$@"
 
-apt-get install -y build-essential dkms
+apt-get install -y build-essential dkms wget curl
 
 srcdir=$(pwd)/src
 mkdir -p ${srcdir}
