@@ -1,0 +1,38 @@
+#!/bin/bash
+
+[ "root" != "$USER" ] && exec sudo $0 "$@"
+
+apt-get install -y build-essential dkms
+
+srcdir=$(pwd)/src
+mkdir -p ${srcdir}
+ENA_VERSION=`wget -qO- --no-check-certificate https://github.com/amzn/amzn-drivers/releases | sed -n 's|.*/archive/ena_linux_\(.*\).tar.gz.*|\1|p' | awk '{ print $1; exit }'`
+echo "Getting latest ENA Library version: $ENA_VERSION"
+curl -s -L https://github.com/amzn/amzn-drivers/archive/ena_linux_${ENA_VERSION}.tar.gz > ${srcdir}/ena.tar.gz
+
+#
+cd ${srcdir}
+#
+mkdir ena
+tar xf ena.tar.gz -C ena --strip-components=1
+mv ena /usr/src/amzn-drivers-${ENA_VERSION}
+cd /usr/src/amzn-drivers-${ENA_VERSION}
+cat > dkms.conf << EOF
+PACKAGE_NAME="ena"
+PACKAGE_VERSION="${ENA_VERSION}"
+CLEAN="make -C kernel/linux/ena clean"
+MAKE="make -C kernel/linux/ena/ BUILD_KERNEL=\${kernelver}"
+BUILT_MODULE_NAME[0]="ena"
+BUILT_MODULE_LOCATION="kernel/linux/ena"
+DEST_MODULE_LOCATION[0]="/updates"
+DEST_MODULE_NAME[0]="ena"
+AUTOINSTALL="yes"
+EOF
+
+dkms add -m amzn-drivers -v ${ENA_VERSION} && \
+dkms build -m amzn-drivers -v ${ENA_VERSION} && \
+dkms install -m amzn-drivers -v ${ENA_VERSION} && \
+update-initramfs -c -k all
+
+modinfo ena
+
